@@ -8,6 +8,9 @@ git checkout main      # voltar para a mais recente
 git diff v1.0 v1.1     # ver o que mudou entre as duas
 ```
 
+## v1.2 — 2026-10-06
+- Novo fundo da conversa (desenhos que se encaixam, 1x no celular e mais de 2x no desktop, versão clara e escura); arte do plano mantém a proporção; menu do celular com fundo borrado e telefone/site sempre visíveis
+
 ## v1.1 — 2026-10-06
 - Celular: menu hambúrguer à esquerda da logo. Ao tocar, abre a propaganda do plano do mês em tela cheia, com telefone e site no rodapé.
 
