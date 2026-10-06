@@ -119,9 +119,63 @@
     .contato a { color: inherit; text-decoration: none; }
     .contato a:hover { color: var(--chat-cor); text-decoration: underline; }
 
+
+    /* ===== Menu hambúrguer (só no celular): abre a propaganda ===== */
+    .opa_menu_btn { display: none; }
+    .destaque-fechar { display: none; }
     /* ===== CELULAR: chat em tela cheia, sem coluna de destaque ===== */
     @media (max-width: 768px) {
       .destaque { display: none; }
+
+      .opa_menu_btn {
+        order: -1;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        margin-left: -4px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        cursor: pointer;
+      }
+      .opa_menu_btn:active { background: rgba(255, 255, 255, .2); }
+      .opa_menu_btn svg { width: 24px; height: 24px; }
+      body .opa_chat .opa_menu_btn svg path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
+
+      /* Menu aberto: a propaganda ocupa a tela, com telefone e site no rodapé */
+      body.menu-aberto .destaque {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        width: auto;
+        z-index: 100000;
+        box-sizing: border-box;
+        padding: 56px 16px 16px;
+        background: rgba(8, 16, 32, .88);
+        animation: wc_subir .2s ease-out;
+      }
+      body.menu-aberto .planos img { object-fit: contain; box-shadow: none; }
+      body.menu-aberto .contato { justify-content: space-between; }
+      body.menu-aberto .destaque-fechar {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, .18);
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+      }
       /* iPhone: campos com fonte menor que 16px fazem o Safari dar zoom ao digitar e bagunçam a altura */
       body .opa_rodape_input { font-size: 16px !important; }
       /* Teclado aberto: trava a página para ela não "sair do lugar" ao arrastar (só enquanto digita,
@@ -665,6 +719,7 @@
 <body>
   <!-- Coluna de destaque (aparece só no desktop). Edite textos, planos e telefone abaixo. -->
   <aside class="destaque">
+    <button type="button" class="destaque-fechar" aria-label="Fechar">&#10005;</button>
     <div class="planos">
       <img src="plano-destaque.webp" alt="Outubro da alegria - 800 Mega por R$ 99,90">
     </div>
@@ -1072,6 +1127,23 @@
         box.appendChild(menos);
         box.appendChild(mais);
         cab.appendChild(box);
+
+        // Menu hambúrguer (aparece só no celular): abre a propaganda
+        var menu = document.createElement('button');
+        menu.type = 'button';
+        menu.className = 'opa_menu_btn';
+        menu.title = 'Menu';
+        menu.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+        cab.insertBefore(menu, cab.firstChild);
+        var coluna = document.querySelector('.destaque');
+        function menuAbrir(v) { document.body.classList.toggle('menu-aberto', v); }
+        menu.onclick = function() { menuAbrir(true); };
+        if (coluna) {
+          coluna.addEventListener('click', function(e) {
+            if (e.target === coluna || (e.target.closest && e.target.closest('.destaque-fechar'))) menuAbrir(false);
+          });
+        }
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') menuAbrir(false); });
 
         var tema = document.createElement('button');
         tema.type = 'button';
