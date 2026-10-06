@@ -301,7 +301,12 @@
       line-height: 40px;
       padding: 0;
     }
+    /* campo do tipo "busca": tira o "x" e o estilo próprio do navegador */
+    body .opa_rodape_input::-webkit-search-cancel-button,
+    body .opa_rodape_input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
     body .opa_rodape_input {
+      -webkit-appearance: none;
+      appearance: none;
       height: 40px !important;
       padding: 0 16px !important;
       border-radius: 20px !important;
@@ -968,6 +973,14 @@
         var rodape = chat.querySelector('.opa_rodape');
         var input = rodape.querySelector('.opa_rodape_input');
         var send = rodape.querySelector('.opa_rodape_send');
+
+        // Campo do tipo "busca": o Android não mostra a barra de preenchimento automático (chave/cartão/pino).
+        // Continua sendo o mesmo campo do widget, então envio por Enter e botão funcionam igual.
+        input.setAttribute('type', 'search');
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('name', 'mensagem-chat');
+        input.setAttribute('enterkeyhint', 'send');
+        input.setAttribute('autocapitalize', 'sentences');
 
         // Painel de emojis
         var painel = document.createElement('div');
