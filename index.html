@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, interactive-widget=resizes-content">
+  <title>Webchat</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0066ff">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DbChat">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <style>
+    /* Personalização do webchat (o prefixo "body" garante prioridade sobre o opa.css) */
+    :root {
+      --chat-cor: #0066ff;      /* cor principal */
+      --chat-fundo: #f5f7fa;    /* fundo da conversa */
+    }
+
+    /* Botão flutuante */
+    body .opa_ico {
+      background: var(--chat-cor);
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      bottom: 20px;
+      right: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+    }
+
+    /* Janela do chat (base) */
+    body .opa_chat {
+      background: var(--chat-fundo);
+      overflow: hidden;
+      font-family: system-ui, "Segoe UI", sans-serif;
+    }
+
+    /* O chat fica sempre aberto: esconde o botão flutuante e os botões de minimizar/fechar */
+    body .opa_ico,
+    body .opa_minimize,
+    body .opa_close,
+    body .sem-login,
+    body .div-logins { display: none !important; }
+    body .opa_cabecalho { padding-right: 12px; }
+
+    /* ===== DESKTOP: coluna de destaque à esquerda + chat à direita ===== */
+    /* Coluna da arte (proporção 9:16, altura da tela menos a faixa de contato). O chat ocupa o resto. */
+    :root { --coluna-largura: clamp(220px, calc((100vh - 108px) * 0.5625), 38vw); }
+
+    body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: #eef2f7; }
+
+    body .opa_chat {
+      top: 20px;
+      bottom: 20px;
+      left: calc(var(--coluna-largura) + 40px);
+      right: 20px;
+      width: auto;
+      height: auto;
+      max-height: none;
+      border-radius: 12px;
+    }
+
+    .destaque {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: fixed;
+      top: 20px;
+      bottom: 20px;
+      left: 20px;
+      width: var(--coluna-largura);
+    }
+    .planos {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .planos img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 14px;
+      box-shadow: 0 6px 24px rgba(0, 40, 120, .25);
+    }
+    .plano {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #dde4ee;
+    }
+    /* Troque o .img por <img src="plano1.jpg"> quando tiver as imagens */
+    .plano .img {
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--chat-cor), #7ab800);
+    }
+    .plano .info { padding: 14px 16px; }
+    .plano .info strong { display: block; font-size: 18px; color: #1a2b4a; }
+    .plano .info span { color: #5b6b85; font-size: 14px; }
+    .contato {
+      flex: none;
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      gap: 6px 16px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .1);
+    }
+    .contato div small { display: block; font-size: 11px; color: #5b6b85; }
+    .contato div strong { font-size: 15px; color: #1a2b4a; }
+    .contato a { color: inherit; text-decoration: none; }
+    .contato a:hover { color: var(--chat-cor); text-decoration: underline; }
+
+    /* ===== CELULAR: chat em tela cheia, sem coluna de destaque ===== */
+    @media (max-width: 768px) {
+      .destaque { display: none; }
+      /* iPhone: campos com fonte menor que 16px fazem o Safari dar zoom ao digitar e bagunçam a altura */
+      body .opa_rodape_input { font-size: 16px !important; }
+      /* Teclado aberto: trava a página para ela não "sair do lugar" ao arrastar (só enquanto digita,
+         assim puxar para atualizar continua funcionando no resto do tempo) */
+      html.teclado, html.teclado body {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      body .opa_chat {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        max-width: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+
+    /* Cabeçalho */
+    body .opa_cabecalho {
+      background: var(--chat-cor);
+      height: 60px;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+    }
+
+    /* Foto à esquerda (estilo WhatsApp) */
+    body .opa_cabecalho::before {
+      content: "";
+      flex: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #fff url("logo.png") center / 70% no-repeat;
+    }
+
+    /* Nome ao lado da foto */
+    body .opa_cabecalho::after {
+      content: "DBNET";
+      color: #fff;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: .5px;
+    }
+
+    body .opa_close,
+    body .opa_minimize {
+      height: 60px;
+      background-position: center;
+    }
+
+    /* "Continuar sem efetuar login" como botão */
+    body .sem-login {
+      display: block;
+      box-sizing: border-box;
+      width: 250px;
+      margin: 12px auto 0;
+      padding: 0 16px;
+      line-height: 40px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      background: var(--chat-cor);
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: filter .15s, transform .05s;
+    }
+    body .sem-login:hover  { filter: brightness(1.1); }
+    body .sem-login:active { transform: scale(.98); }
+
+    /* ===== Barra inferior ===== */
+    body .opa_rodape {
+      height: auto;
+      min-height: 64px;
+      padding: 10px 12px;
+      gap: 8px;
+      align-items: center;
+      background: #fff;
+      border-top: 1px solid #e3e8ef;
+    }
+    body .opa_rodape_menu,
+    body .opa_rodape_send,
+    body .opa_emoji_btn {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background-color .15s, transform .05s;
+    }
+    body .opa_rodape_menu {
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%236b7a90' d='M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z'/></svg>");
+      background-size: 22px;
+    }
+    body .opa_rodape_menu:hover,
+    body .opa_emoji_btn:hover { background-color: #eef2f7; opacity: 1; }
+    body .opa_emoji_btn {
+      border: 0;
+      background: transparent;
+      font-size: 22px;
+      line-height: 40px;
+      padding: 0;
+    }
+    body .opa_rodape_input {
+      height: 40px !important;
+      padding: 0 16px !important;
+      border-radius: 20px !important;
+      background: #f0f2f5 !important;
+      font-size: 15px !important;
+      min-width: 0;
+    }
+    body .opa_rodape_send {
+      background-color: var(--chat-cor);
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='white' d='M2 21l21-9L2 3v7l15 2-15 2z'/></svg>");
+      background-size: 20px;
+    }
+    body .opa_rodape_send:hover { opacity: 1; filter: brightness(1.12); }
+    body .opa_rodape_send:active { transform: scale(.94); }
+
+    /* Mensagens prontas (só antes de começar a conversa) */
+    .opa_atalhos {
+      flex: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px 4px;
+      background: var(--chat-fundo);
+    }
+    .opa_atalhos button {
+      border: 1px solid var(--chat-cor);
+      background: #fff;
+      color: var(--chat-cor);
+      border-radius: 18px;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background-color .15s, color .15s;
+    }
+    .opa_atalhos button:hover { background: var(--chat-cor); color: #fff; }
+
+
+    /* Atendimento encerrado: campo desativado + botão de novo atendimento */
+    body .opa_rodape.encerrado > :not(.opa_novo) { display: none !important; }
+    .opa_novo {
+      flex: 1;
+      height: 44px;
+      border: 0;
+      border-radius: 22px;
+      background: var(--chat-cor);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .opa_novo:hover { filter: brightness(1.1); }
+    .opa_aviso_fim {
+      flex: none;
+      padding: 10px 12px;
+      text-align: center;
+      font-size: 13px;
+      color: #5b6b85;
+      background: var(--chat-fundo);
+    }
+
+
+    /* ===== Mensagens: avatar + nome fora do balão ===== */
+    body .opa_msg {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 6px 12px;
+    }
+    body .opa_msg.enviada { flex-direction: row-reverse; }
+    .opa_msg_col {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      max-width: calc(100% - 52px);
+    }
+    .opa_msg.enviada .opa_msg_col { align-items: flex-end; }
+    .opa_nome {
+      margin: 0 6px 3px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5b6b85;
+    }
+    .opa_avatar {
+      flex: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+    }
+    .opa_avatar.atendente { background: #fff url("logo.png") center / 70% no-repeat; }
+    .opa_avatar.cliente {
+      background: #c5d0de url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'><circle cx='18' cy='14' r='6' fill='white'/><path d='M6 33c0-7 5-11 12-11s12 4 12 11z' fill='white'/></svg>") center / cover no-repeat;
+    }
+    /* balões sem a "setinha" antiga, com visual mais limpo */
+    body .opa_ballon { margin: 0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+    body .opa_ballon::before,
+    body .opa_ballon::after { display: none !important; }
+    body .opa_ballon.recebida { background: #fff; border-bottom-left-radius: 4px; }
+    body .opa_ballon.enviada  { background: #dcebff; border-bottom-right-radius: 4px; }
+
+
+    /* ===== Áudio ===== */
+    .opa_mic_btn, .opa_rec_cancel, .opa_rec_enviar {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 50%;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color .15s;
+    }
+    .opa_mic_btn, .opa_rec_cancel { background: transparent; }
+    .opa_mic_btn:hover, .opa_rec_cancel:hover { background: #eef2f7; }
+    .opa_mic_btn svg { width: 22px; height: 22px; }
+    /* o opa.css pinta todo path de branco, então precisa sobrescrever no path */
+    body .opa_chat .opa_mic_btn svg path { fill: #6b7a90; }
+    body .opa_chat .opa_rec_enviar svg path { fill: #fff; }
+    .opa_rec_cancel { color: #d93025; font-size: 18px; }
+    .opa_rec_enviar { background: var(--chat-cor); }
+    .opa_rec_enviar:hover { filter: brightness(1.12); }
+    .opa_rec_enviar svg { width: 20px; height: 20px; fill: #fff; }
+    .opa_rec {
+      display: none;
+      flex: 1;
+      align-items: center;
+      gap: 10px;
+    }
+    .opa_rec_dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #d93025;
+      animation: opa_piscar 1s infinite;
+    }
+    .opa_rec_tempo { flex: 1; font-size: 16px; color: #1a2b4a; font-variant-numeric: tabular-nums; }
+    @keyframes opa_piscar { 50% { opacity: .25; } }
+    /* Gravando: esconde o resto da barra e mostra só o gravador */
+    body .opa_rodape.gravando > :not(.opa_rec) { display: none !important; }
+    body .opa_rodape.gravando > .opa_rec { display: flex; }
+
+
+    /* ===== Tamanho da fonte da conversa (A- / A+) ===== */
+    body .opa_chat { --zoom-fonte: 1; }
+    body .opa_ballon { font-size: calc(14px * var(--zoom-fonte)); line-height: 1.45; }
+    body .opa_ballon .time { font-size: calc(10px * var(--zoom-fonte)); line-height: 1.2; }
+    .opa_nome { font-size: calc(12px * var(--zoom-fonte)); }
+    .opa_fonte {
+      order: 3;            /* depois do nome DBNET */
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+    .opa_fonte button {
+      box-sizing: border-box;
+      width: 38px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .55);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .12);
+      color: #fff;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: .5px;
+      cursor: pointer;
+    }
+    .opa_fonte button:hover:not(:disabled) { background: rgba(255, 255, 255, .28); }
+    .opa_fonte button:disabled { opacity: .4; cursor: default; }
+
+
+    /* ===== Botão de tema (claro/escuro) ===== */
+    .opa_tema {
+      order: 4;
+      flex: none;
+      box-sizing: border-box;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .55);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .12);
+      cursor: pointer;
+      margin-left: -4px;
+    }
+    .opa_tema:hover { background: rgba(255, 255, 255, .28); }
+    .opa_tema svg { width: 18px; height: 18px; }
+    body .opa_chat .opa_tema svg path { fill: #fff; }
+    .opa_tema .sol { display: none; }
+    body.escuro .opa_tema .sol { display: block; }
+    body.escuro .opa_tema .lua { display: none; }
+
+    /* ===== Modo escuro ===== */
+    body.escuro { --chat-fundo: #0f1722; background: #0b1220; color: #e6edf7; }
+    body.escuro .contato div strong { color: #e6edf7; }
+    body.escuro .contato { background: #172033; box-shadow: none; }
+    body.escuro .contato div small { color: #9fb0c8; }
+    body.escuro .planos img { box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
+
+    body.escuro .opa_chat { box-shadow: 0 0 0 1px #2a3750, 0 6px 24px rgba(0, 0, 0, .6); }
+    body.escuro .opa_rodape { background: #172033; border-top-color: #2a3750; }
+    body.escuro .opa_rodape_input { background: #243049 !important; color: #e6edf7 !important; }
+    body.escuro .opa_rodape_input::placeholder { color: #8394ae; }
+    body.escuro .opa_rodape_menu:hover,
+    body.escuro .opa_emoji_btn:hover,
+    body.escuro .opa_mic_btn:hover,
+    body.escuro .opa_rec_cancel:hover { background-color: #243049; }
+    body.escuro .opa_chat .opa_mic_btn svg path { fill: #9fb0c8; }
+    body.escuro .opa_rec_tempo { color: #e6edf7; }
+
+    body.escuro .opa_nome { color: #9fb0c8; }
+    body.escuro .opa_ballon { color: #e6edf7; box-shadow: none; }
+    body.escuro .opa_ballon.recebida { background: #1f2a40; }
+    body.escuro .opa_ballon.enviada { background: #1f4b8f; }
+    body.escuro .opa_ballon .time { color: rgba(255, 255, 255, .55); }
+    body.escuro .opa_avatar { box-shadow: none; }
+
+    body.escuro .opa_atalhos button { background: #172033; color: #8ab6ff; border-color: #3d6fc4; }
+    body.escuro .opa_atalhos button:hover { background: var(--chat-cor); color: #fff; }
+    body.escuro .opa_emojis { background: #172033; border-top-color: #2a3750; }
+    body.escuro .opa_emojis button:hover { background: #243049; }
+    body.escuro .opa_aviso_fim { color: #9fb0c8; }
+
+
+    /* ===== Botão de sair + confirmação ===== */
+    .opa_sair {
+      order: 5;
+      flex: none;
+      box-sizing: border-box;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .55);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .12);
+      cursor: pointer;
+      margin-left: -4px;
+    }
+    .opa_sair:hover { background: rgba(255, 255, 255, .28); }
+    .opa_sair svg { width: 18px; height: 18px; }
+    body .opa_chat .opa_sair svg path { fill: #fff; }
+    .atendimento_encerrado .opa_sair { display: none; }
+
+    .opa_confirma {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .45);
+    }
+    .opa_confirma .caixa {
+      width: 100%;
+      max-width: 320px;
+      padding: 22px 20px 18px;
+      border-radius: 14px;
+      background: #fff;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .35);
+    }
+    .opa_confirma p { margin: 0 0 18px; font-size: 16px; line-height: 1.4; color: #1a2b4a; }
+    .opa_confirma .botoes { display: flex; gap: 10px; }
+    .opa_confirma button {
+      flex: 1;
+      height: 42px;
+      border-radius: 21px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .opa_confirma .nao { border: 1px solid #c5d0de; background: #fff; color: #1a2b4a; }
+    .opa_confirma .sim { border: 0; background: #d93025; color: #fff; }
+    .opa_confirma button:hover { filter: brightness(.95); }
+    body.escuro .opa_confirma .caixa { background: #172033; }
+    body.escuro .opa_confirma p { color: #e6edf7; }
+    body.escuro .opa_confirma .nao { background: #243049; border-color: #3a4a68; color: #e6edf7; }
+
+
+    /* ===== Fundo da conversa: logo repetido (fundo-padrao.png, 2 logos por bloco) ===== */
+    body .opa_corpo {
+      background-color: var(--chat-fundo);
+      background-image: url("fundo-padrao.png");
+      background-size: 100px 100px;   /* tamanho do bloco: menor = logos menores */
+      background-repeat: repeat;
+    }
+    body .opa_corpo { overscroll-behavior: contain; }
+    body.escuro .opa_corpo {
+      background-color: #121c2e;
+      background-image: url("fundo-padrao-escuro.png");
+    }
+
+
+    /* ===== Popups: notificações e instalar app ===== */
+    .wc_popup {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 100001;
+      width: 360px;
+      max-width: calc(100% - 24px);
+      box-sizing: border-box;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #fff;
+      color: #1a2b4a;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .3);
+      animation: wc_subir .25s ease-out;
+    }
+    @keyframes wc_subir { from { transform: translateY(20px); opacity: 0; } }
+    .wc_popup .wc_ico {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #fff url("logo.png") center / 70% no-repeat;
+      box-shadow: 0 0 0 1px #dde4ee;
+    }
+    .wc_popup .wc_txt { flex: 1; min-width: 0; }
+    .wc_popup strong { display: block; font-size: 16px; margin-bottom: 4px; }
+    .wc_popup p { margin: 0; font-size: 14px; line-height: 1.4; color: #5b6b85; }
+    .wc_popup .wc_btns { display: flex; gap: 10px; width: 100%; }
+    .wc_popup button {
+      flex: 1;
+      height: 42px;
+      border-radius: 21px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .wc_popup .wc_sim { border: 0; background: var(--chat-cor); color: #fff; }
+    .wc_popup .wc_nao { border: 1px solid #c5d0de; background: transparent; color: inherit; }
+    .wc_popup button:hover { filter: brightness(.95); }
+
+    .wc_popup .wc_passos {
+      width: 100%;
+      margin: 0;
+      padding: 0 0 0 4px;
+      list-style: none;
+      counter-reset: passo;
+    }
+    .wc_popup .wc_passos li {
+      counter-increment: passo;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .wc_popup .wc_passos li::before {
+      content: counter(passo);
+      flex: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--chat-cor);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wc_popup .wc_passos svg { width: 18px; height: 18px; vertical-align: -4px; margin: 0 2px; }
+    .wc_popup .wc_passos svg path, .wc_popup .wc_passos svg rect { fill: none; stroke: var(--chat-cor); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    body.escuro .wc_popup { background: #172033; color: #e6edf7; }
+    body.escuro .wc_popup p { color: #9fb0c8; }
+    body.escuro .wc_popup .wc_nao { border-color: #3a4a68; }
+    @media (max-width: 768px) {
+      .wc_popup { left: 12px; right: 12px; bottom: 12px; width: auto; max-width: none; }
+    }
+
+    /* Painel de emojis */
+    .opa_emojis {
+      flex: none;
+      display: none;
+      grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+      gap: 2px;
+      max-height: 170px;
+      overflow-y: auto;
+      padding: 8px 10px;
+      background: #fff;
+      border-top: 1px solid #e3e8ef;
+    }
+    .opa_emojis.aberto { display: grid; }
+    .opa_emojis button {
+      border: 0;
+      background: transparent;
+      font-size: 24px;
+      line-height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .opa_emojis button:hover { background: #eef2f7; }
+  </style>
+</head>
+<body>
+  <!-- Coluna de destaque (aparece só no desktop). Edite textos, planos e telefone abaixo. -->
+  <aside class="destaque">
+    <div class="planos">
+      <img src="plano-destaque.webp" alt="Outubro da alegria - 800 Mega por R$ 99,90">
+    </div>
+
+    <div class="contato">
+      <div><small>Telefone</small><strong><a href="tel:+551231859099">(12) 3185-9099</a></strong></div>
+      <div><small>Site</small><strong><a href="https://www.dbnet.com.vc" target="_blank" rel="noopener">www.dbnet.com.vc</a></strong></div>
+    </div>
+  </aside>
+
+  <script>
+    (function(
+      i, s, g, r, j, y, b, p, t, z, a
+    ) {
+      a = s.createElement(r);
+      a.async = true;
+      a.src = g.concat(
+        b, j,
+        b, y,
+        p, j
+      );
+      s.head.appendChild(a);
+      a.onload = function() {
+        // Cada mensagem ganha avatar e o nome fora do balão
+        var mensagemOriginal = opa.mensagem;
+        opa.mensagem = function(local) {
+          var r = mensagemOriginal.apply(opa, arguments);
+          try { decorarMensagem(local); } catch (e) { console.warn('[webchat] decorar:', e); }
+          try {
+            // Mensagem que o cliente acabou de enviar (histórico chega no evento "Messages" e é ignorado)
+            if (local === 'enviada' && window.webchatUltimoEvento === 'Message' && window.webchatPrimeiraMensagem) {
+              window.webchatPrimeiraMensagem();
+            }
+          } catch (e) {}
+          try {
+            // Aviso quando o atendente responde e a aba não está à vista
+            if (local === 'recebida' && document.hidden && performance.now() > 5000 && window.webchatNotificar) {
+              window.webchatNotificar(arguments[1]);
+            }
+          } catch (e) {}
+          return r;
+        };
+        function decorarMensagem(local) {
+          var linha = opa.estrutura.corpo.lastElementChild;
+          if (!linha || linha.classList.contains('opa_msg')) return;
+          var ballon = linha.querySelector('.opa_ballon');
+          var time = ballon && ballon.querySelector(':scope > .time');
+          if (!ballon || !time) return;
+
+          // O widget escreve "Nome - hora" dentro do balão: separa os dois
+          var txt = time.textContent;
+          var i = txt.lastIndexOf(' - ');
+          var nome = i > -1 ? txt.slice(0, i) : '';
+          time.textContent = i > -1 ? txt.slice(i + 3) : txt;
+          if (!nome || /^(Sem nome|Sin nombre|No name)$/.test(nome)) {
+            nome = local === 'enviada' ? 'Cliente' : 'DBNET';
+          }
+
+          var label = document.createElement('div');
+          label.className = 'opa_nome';
+          label.textContent = nome;
+
+          var avatar = document.createElement('div');
+          avatar.className = 'opa_avatar ' + (local === 'enviada' ? 'cliente' : 'atendente');
+
+          var col = document.createElement('div');
+          col.className = 'opa_msg_col';
+          col.appendChild(label);
+          col.appendChild(ballon);
+
+          linha.classList.add('opa_msg', local);
+          linha.appendChild(avatar);
+          linha.appendChild(col);
+          ballon.scrollIntoView();
+        }
+
+        // Sessão do cliente: além do cookie do widget, guarda uma cópia no armazenamento do navegador.
+        // O Safari do iPhone apaga cookies com facilidade; se isso acontecer, restauramos a cópia.
+        var setCookieOriginal = opa.setCookie;
+        opa.setCookie = function(nome, valor, dias) {
+          setCookieOriginal.apply(opa, arguments);
+          if (nome === 'opa_user') {
+            try { localStorage.setItem('webchat_opa_user', valor); } catch (e) {}
+            // reforça o cookie com atributos que o Safari respeita melhor
+            var exp = new Date(Date.now() + dias * 864e5).toUTCString();
+            document.cookie = nome + '=' + valor + ';expires=' + exp + ';path=/;SameSite=Lax' +
+                              (location.protocol === 'https:' ? ';Secure' : '');
+          }
+        };
+        try {
+          var salvo = localStorage.getItem('webchat_opa_user');
+          if (salvo && !/(?:^|;\s*)opa_user=/.test(document.cookie)) opa.setCookie('opa_user', salvo, 1000);
+        } catch (e) {}
+
+        try {
+          var mc = document.cookie.match(/(?:^|;\s*)opa_user=([^;]+)/);
+          if (mc) localStorage.setItem('webchat_opa_user', mc[1]);
+        } catch (e) {}
+
+        opa.init(g, t, z);
+        // Abre o chat automaticamente ao carregar a página
+        setTimeout(function() { opa.estrutura.ico.click(); }, 500);
+
+        // Pula a tela de login: clica sozinho em "Continuar sem efetuar login".
+        // Espera a conexão com o Opa ficar pronta e dá um respiro para o servidor reconhecer o cliente;
+        // se pedirmos o histórico cedo demais, ele ignora e a conversa não volta.
+        var tentativas = 0;
+        var conectadoEm = 0;
+        var viuHistorico = false;
+        var escutando = false;
+        var timer = setInterval(function() {
+          tentativas++;
+          var sock = opa.socket;
+          if (sock && !escutando) {
+            escutando = true;
+            sock.onAny(function(nome) { if (nome === 'Messages') viuHistorico = true; });
+          }
+          if (sock && sock.connected && !conectadoEm) conectadoEm = Date.now();
+          var btn = document.querySelector('.sem-login');
+          var pronto = btn && sock && conectadoEm && (Date.now() - conectadoEm >= 1200);
+          if (pronto || tentativas > 200) {
+            clearInterval(timer);
+            if (btn && sock) {
+              btn.click();
+              // Se o histórico não chegou, pede mais uma vez (para cliente novo a resposta é vazia e não faz mal)
+              setTimeout(function() {
+                if (!viuHistorico && !document.querySelector('.opa_ballon') && sock.connected) {
+                  sock.emit('get_mensagens_atendimento_web_chat');
+                }
+              }, 3000);
+            }
+          }
+        }, 100);
+      };
+    })(
+      window,
+      document,
+      'https://opa.dbnet.com.vc',
+      'script',
+      'js',
+      'opa',
+      '/',
+      '.',
+      '6abe558c9aa1517d641c0b56',
+      `{
+      "permitir_login_anonimo": "on",
+      "facebook_appid": "",
+      "google_credential": "",
+      "google_oauth": ""
+    }`
+    );
+  </script>
+
+  <script>
+    /* Barra inferior: botão de emojis + mensagens prontas */
+    (function() {
+      // Edite aqui as mensagens prontas
+      var RESPOSTAS = ['Preciso do boleto', 'Iniciar atendimento'];
+      var EMOJIS = ('😀 😃 😄 😁 😅 😂 🤣 😊 🙂 😉 😍 😘 😎 🤗 🤔 😐 😕 😢 😭 😡 ' +
+                    '👍 👎 👏 🙌 🙏 💪 👋 🤝 ✌️ 👌 ❤️ 💙 💚 🔥 ⭐ ✅ ❌ ⚠️ 🎉 🚀 ' +
+                    '📞 📱 💻 🌐 📶 🔧 🏠 💳 📄 ⏰').split(' ');
+
+      var ICONE_MIC = '<svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>';
+      var ICONE_ENVIAR = '<svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>';
+
+      function montarAudio(rodape, send, atalhos) {
+        var mic = document.createElement('button');
+        mic.type = 'button';
+        mic.className = 'opa_mic_btn';
+        mic.title = 'Gravar áudio';
+        mic.innerHTML = ICONE_MIC;
+        rodape.insertBefore(mic, send);
+
+        var rec = document.createElement('div');
+        rec.className = 'opa_rec';
+        rec.innerHTML = '<button type="button" class="opa_rec_cancel" title="Cancelar">✕</button>' +
+                        '<span class="opa_rec_dot"></span><span class="opa_rec_tempo">0:00</span>' +
+                        '<button type="button" class="opa_rec_enviar" title="Enviar áudio">' + ICONE_ENVIAR + '</button>';
+        rodape.appendChild(rec);
+        var tempo = rec.querySelector('.opa_rec_tempo');
+        var btnCancelar = rec.querySelector('.opa_rec_cancel');
+        var btnEnviar = rec.querySelector('.opa_rec_enviar');
+
+        var mr, chunks, stream, timer, inicio, deveEnviar;
+
+        function limpar() {
+          clearInterval(timer);
+          if (stream) stream.getTracks().forEach(function(t) { t.stop(); });
+          rodape.classList.remove('gravando');
+        }
+
+        function enviarAudio(blob, nome) {
+          var fr = new FileReader();
+          fr.onload = function() {
+            // Mesmo formato que o widget usa para anexos
+            opa.socket.emit('mensagem', '', '', {
+              tipo: 'midia',
+              conteudo: { nomeArquivo: nome, data: fr.result }
+            });
+            atalhos.remove();
+          };
+          fr.readAsDataURL(blob);
+        }
+
+        mic.onclick = function() {
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s) {
+            stream = s;
+            chunks = [];
+            deveEnviar = false;
+            var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].filter(function(m) {
+              return MediaRecorder.isTypeSupported(m);
+            })[0];
+            mr = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s);
+            mr.ondataavailable = function(e) { if (e.data && e.data.size) chunks.push(e.data); };
+            mr.onstop = function() {
+              var tipo = (mr.mimeType || 'audio/webm').split(';')[0];
+              limpar();
+              if (!deveEnviar || !chunks.length) return;
+              enviarAudio(new Blob(chunks, { type: tipo }), 'audio.' + (tipo.indexOf('mp4') > -1 ? 'm4a' : 'webm'));
+            };
+            mr.start();
+            inicio = Date.now();
+            tempo.textContent = '0:00';
+            rodape.classList.add('gravando');
+            timer = setInterval(function() {
+              var seg = Math.floor((Date.now() - inicio) / 1000);
+              tempo.textContent = Math.floor(seg / 60) + ':' + ('0' + (seg % 60)).slice(-2);
+              if (seg >= 300) btnEnviar.click(); // limite de 5 minutos
+            }, 250);
+          }).catch(function() {
+            alert('Não foi possível acessar o microfone. Libere a permissão no navegador (o site precisa estar em HTTPS ou localhost).');
+          });
+        };
+        btnCancelar.onclick = function() { deveEnviar = false; if (mr && mr.state !== 'inactive') mr.stop(); };
+        btnEnviar.onclick = function() { deveEnviar = true; if (mr && mr.state !== 'inactive') mr.stop(); };
+      }
+
+      function montar() {
+        var chat = document.querySelector('.opa_chat');
+        var rodape = chat.querySelector('.opa_rodape');
+        var input = rodape.querySelector('.opa_rodape_input');
+        var send = rodape.querySelector('.opa_rodape_send');
+
+        // Painel de emojis
+        var painel = document.createElement('div');
+        painel.className = 'opa_emojis';
+        EMOJIS.forEach(function(e) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = e;
+          b.onclick = function() {
+            var ini = input.selectionStart == null ? input.value.length : input.selectionStart;
+            var fim = input.selectionEnd == null ? ini : input.selectionEnd;
+            input.value = input.value.slice(0, ini) + e + input.value.slice(fim);
+            input.focus();
+            input.setSelectionRange(ini + e.length, ini + e.length);
+          };
+          painel.appendChild(b);
+        });
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'opa_emoji_btn';
+        btn.title = 'Emojis';
+        btn.textContent = '😊';
+        btn.onclick = function() { painel.classList.toggle('aberto'); };
+        rodape.insertBefore(btn, input);
+
+        // Mensagens prontas
+        var atalhos = document.createElement('div');
+        atalhos.className = 'opa_atalhos';
+        RESPOSTAS.forEach(function(txt) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = txt;
+          b.onclick = function() {
+            input.value = txt;
+            send.click();
+            atalhos.remove();
+          };
+          atalhos.appendChild(b);
+        });
+
+        chat.insertBefore(atalhos, rodape);
+
+        // Veio do botão "Iniciar novo atendimento": já manda "Iniciar atendimento" sozinho
+        var auto = false;
+        try {
+          auto = sessionStorage.getItem('webchat_auto_iniciar') === '1';
+          sessionStorage.removeItem('webchat_auto_iniciar');
+        } catch (e) {}
+        if (auto) {
+          input.value = 'Iniciar atendimento';
+          send.click();
+          atalhos.remove();
+        }
+
+        // Áudio (precisa de microfone liberado e de HTTPS ou localhost)
+        if (navigator.mediaDevices && window.MediaRecorder) montarAudio(rodape, send, atalhos);
+        chat.insertBefore(painel, rodape);
+
+        // Some assim que o cliente enviar qualquer mensagem (ou se já houver conversa)
+        function verificar() {
+          if (chat.querySelector('.opa_ballon.enviada')) { atalhos.remove(); mo.disconnect(); }
+        }
+        var mo = new MutationObserver(verificar);
+        mo.observe(chat, { childList: true, subtree: true });
+        setTimeout(verificar, 1500);
+      }
+
+      var obs = new MutationObserver(function() {
+        if (document.querySelector('.opa_rodape .opa_rodape_input')) { obs.disconnect(); montar(); }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
+  <script>
+    /* Atendimento encerrado: desativa o campo e mostra "Iniciar novo atendimento" */
+    (function() {
+      var DEBUG = /[?&]debug\b/.test(location.search);
+      var jaEncerrou = false;
+
+      function encerrado() {
+        if (jaEncerrou) return;
+        var chat = document.querySelector('.opa_chat');
+        var rodape = chat && chat.querySelector('.opa_rodape');
+        if (!rodape) return;
+        jaEncerrou = true;
+        chat.classList.add('atendimento_encerrado');
+
+        var input = rodape.querySelector('.opa_rodape_input');
+        if (input) { input.disabled = true; input.value = ''; }
+        ['.opa_atalhos', '.opa_emojis'].forEach(function(sel) {
+          var el = chat.querySelector(sel);
+          if (el) el.remove();
+        });
+
+        var aviso = document.createElement('div');
+        aviso.className = 'opa_aviso_fim';
+        aviso.textContent = 'Atendimento encerrado.';
+        chat.insertBefore(aviso, rodape);
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'opa_novo';
+        btn.textContent = 'Iniciar novo atendimento';
+        btn.onclick = function() {
+          try { opa.socket.emit('encerrarAtendimento'); } catch (e) {}
+          try { sessionStorage.setItem('webchat_auto_iniciar', '1'); } catch (e) {}
+          location.reload();
+        };
+        rodape.classList.add('encerrado');
+        rodape.appendChild(btn);
+        var corpo = chat.querySelector('.opa_corpo');
+        if (corpo) corpo.scrollTop = corpo.scrollHeight;
+      }
+
+      // Para testar a aparência: abra o console e digite webchatEncerrar()
+      window.webchatEncerrar = encerrado;
+
+      function ligar() {
+        var sock = opa.socket;
+        sock.onAny(function(nome) {
+          if (DEBUG) console.log('[webchat] evento:', nome, Array.prototype.slice.call(arguments, 1));
+          if (/encerr|finaliz|fim_|_fim|closed/i.test(nome) && !/^(Message|Messages|Document)$/.test(nome)) encerrado();
+        });
+        sock.on('disconnect', function(motivo) {
+          if (DEBUG) console.log('[webchat] disconnect:', motivo);
+          if (motivo === 'io server disconnect') encerrado();
+        });
+      }
+
+      var tentativas = 0;
+      var t = setInterval(function() {
+        if ((typeof opa !== 'undefined' && opa.socket) || ++tentativas > 100) {
+          clearInterval(t);
+          if (typeof opa !== 'undefined' && opa.socket) ligar();
+        }
+      }, 100);
+    })();
+  </script>  <script>
+    /* Botões A- / A+ no cabeçalho */
+    (function() {
+      // Tema: aplica o salvo logo de cara (evita piscar)
+      var escuro = false;
+      try { escuro = localStorage.getItem('webchat_tema') === 'escuro'; } catch (e) {}
+      document.body.classList.toggle('escuro', escuro);
+
+      var NIVEIS = [0.85, 1, 1.15, 1.3, 1.5];
+      var nivel = 1;
+      try {
+        var salvo = parseInt(localStorage.getItem('webchat_fonte'), 10);
+        if (salvo >= 0 && salvo < NIVEIS.length) nivel = salvo;
+      } catch (e) {}
+
+      function montar(cab) {
+        var chat = cab.parentNode;
+        var box = document.createElement('div');
+        box.className = 'opa_fonte';
+        var menos = document.createElement('button');
+        var mais = document.createElement('button');
+        menos.type = mais.type = 'button';
+        menos.className = 'menos'; menos.textContent = 'A−'; menos.title = 'Diminuir fonte';
+        mais.className = 'mais';   mais.textContent = 'A+'; mais.title = 'Aumentar fonte';
+        box.appendChild(menos);
+        box.appendChild(mais);
+        cab.appendChild(box);
+
+        var tema = document.createElement('button');
+        tema.type = 'button';
+        tema.className = 'opa_tema';
+        tema.innerHTML =
+          '<svg class="lua" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>' +
+          '<svg class="sol" viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM11 1h2v3h-2zM11 20h2v3h-2zM1 11h3v2H1zM20 11h3v2h-3zM4.2 5.6l1.4-1.4 2.1 2.1-1.4 1.4zM16.3 17.7l1.4-1.4 2.1 2.1-1.4 1.4zM4.2 18.4l2.1-2.1 1.4 1.4-2.1 2.1zM16.3 6.3l2.1-2.1 1.4 1.4-2.1 2.1z"/></svg>';
+        function rotuloTema() { tema.title = document.body.classList.contains('escuro') ? 'Modo claro' : 'Modo escuro'; }
+        tema.onclick = function() {
+          var e = document.body.classList.toggle('escuro');
+          try { localStorage.setItem('webchat_tema', e ? 'escuro' : 'claro'); } catch (x) {}
+          rotuloTema();
+        };
+        rotuloTema();
+        cab.appendChild(tema);
+
+        // Botão de sair (encerrar atendimento) com confirmação
+        var sair = document.createElement('button');
+        sair.type = 'button';
+        sair.className = 'opa_sair';
+        sair.title = 'Encerrar atendimento';
+        sair.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>';
+        sair.onclick = function() {
+          if (chat.querySelector('.opa_confirma')) return;
+          var ov = document.createElement('div');
+          ov.className = 'opa_confirma';
+          ov.innerHTML = '<div class="caixa"><p>Deseja realmente encerrar o atendimento?</p>' +
+                         '<div class="botoes"><button type="button" class="nao">Não</button>' +
+                         '<button type="button" class="sim">Sim</button></div></div>';
+          ov.querySelector('.nao').onclick = function() { ov.remove(); };
+          ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+          ov.querySelector('.sim').onclick = function() {
+            ov.remove();
+            var input = chat.querySelector('.opa_rodape_input');
+            var send = chat.querySelector('.opa_rodape_send');
+            if (!input || !send) return;
+            // Envia /fim como se o cliente tivesse digitado
+            input.value = '/fim';
+            send.click();
+            setTimeout(function() { if (window.webchatEncerrar) window.webchatEncerrar(); }, 1200);
+          };
+          chat.appendChild(ov);
+        };
+        cab.appendChild(sair);
+
+        function aplicar() {
+          chat.style.setProperty('--zoom-fonte', NIVEIS[nivel]);
+          menos.disabled = nivel === 0;
+          mais.disabled = nivel === NIVEIS.length - 1;
+          try { localStorage.setItem('webchat_fonte', nivel); } catch (e) {}
+          var corpo = chat.querySelector('.opa_corpo');
+          if (corpo) corpo.scrollTop = corpo.scrollHeight;
+        }
+        menos.onclick = function() { if (nivel > 0) { nivel--; aplicar(); } };
+        mais.onclick = function() { if (nivel < NIVEIS.length - 1) { nivel++; aplicar(); } };
+        aplicar();
+      }
+
+      var obs = new MutationObserver(function() {
+        var cab = document.querySelector('.opa_cabecalho');
+        if (cab) { obs.disconnect(); montar(cab); }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>  <script>
+    /* Celular: acompanha a área realmente visível quando o teclado abre */
+    (function() {
+      var vv = window.visualViewport;
+      if (!vv) return;
+      var mobile = window.matchMedia('(max-width: 768px)');
+      var ultimaAltura = 0;
+
+      function ajustar() {
+        var chat = document.querySelector('.opa_chat');
+        if (!chat) return;
+        if (mobile.matches) {
+          // vv.scale compensa algum zoom que o Safari tenha aplicado
+          var altura = Math.round(vv.height * vv.scale);
+          chat.style.height = altura + 'px';
+          chat.style.top = vv.offsetTop + 'px';
+          chat.style.bottom = 'auto';
+          if (altura !== ultimaAltura) {
+            ultimaAltura = altura;
+            var corpo = chat.querySelector('.opa_corpo');
+            if (corpo) corpo.scrollTop = corpo.scrollHeight;
+          }
+        } else {
+          chat.style.height = chat.style.top = chat.style.bottom = '';
+        }
+      }
+
+      vv.addEventListener('resize', ajustar);
+      vv.addEventListener('scroll', ajustar);
+      window.addEventListener('orientationchange', ajustar);
+
+      // iPhone: o Safari nem sempre avisa quando o teclado termina de abrir (ou quando a barra de
+      // sugestões aparece). Enquanto um campo está em foco, confere a altura a cada instante.
+      var poll = null;
+      function campoEmFoco() {
+        var el = document.activeElement;
+        return !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName);
+      }
+      function acompanhar() {
+        if (poll) return;
+        poll = setInterval(function() {
+          ajustar();
+          if (!campoEmFoco()) { clearInterval(poll); poll = null; }
+        }, 150);
+      }
+      document.addEventListener('touchmove', function(e) {
+        if (!document.documentElement.classList.contains('teclado')) return;
+        if (e.target.closest && e.target.closest('.opa_corpo, .opa_emojis')) return;
+        e.preventDefault();
+      }, { passive: false });
+
+      document.addEventListener('focusin', function() {
+        if (campoEmFoco()) {
+          document.documentElement.classList.add('teclado');
+          window.scrollTo(0, 0);
+        }
+        ajustar();
+        acompanhar();
+      });
+      document.addEventListener('focusout', function() {
+        setTimeout(function() {
+          if (!campoEmFoco()) document.documentElement.classList.remove('teclado');
+        }, 100);
+        [100, 400, 900].forEach(function(t) { setTimeout(ajustar, t); });
+      });
+
+      var obs = new MutationObserver(function() {
+        if (document.querySelector('.opa_chat')) { obs.disconnect(); ajustar(); }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>  <script>
+    /* App instalável (PWA) + notificações do navegador */
+    (function() {
+      var SETE_DIAS = 7 * 24 * 60 * 60 * 1000;
+      function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+      function adiado(k) { return Date.now() < Number(lsGet(k) || 0); }
+      function adiar(k) { lsSet(k, String(Date.now() + SETE_DIAS)); }
+
+      var mobile = window.matchMedia('(max-width: 768px)').matches ||
+                   window.matchMedia('(pointer: coarse)').matches;
+      var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+      var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var promptInstalar = null;
+      var swOk = false;
+
+      // Service worker (precisa de HTTPS ou localhost)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(function() { swOk = true; }).catch(function() {});
+      }
+      window.addEventListener('beforeinstallprompt', function(e) { e.preventDefault(); promptInstalar = e; });
+      window.addEventListener('appinstalled', function() { fechar(); });
+
+      // ---- Notificação de nova mensagem ----
+      window.webchatNotificar = function(dados) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        var texto = 'Você recebeu uma nova mensagem.';
+        if (dados && typeof dados.mensagem === 'string') {
+          var d = document.createElement('div');
+          d.innerHTML = dados.mensagem;
+          texto = (d.textContent || '').trim().slice(0, 140) || texto;
+        } else if (dados && dados.objeto) {
+          texto = 'Você recebeu um arquivo.';
+        }
+        var opcoes = { body: texto, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'dbnet-chat', renotify: true };
+        if (swOk && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then(function(reg) { reg.showNotification('DBNET', opcoes); });
+        } else {
+          try { new Notification('DBNET', opcoes); } catch (e) {}
+        }
+      };
+
+      // ---- Popups ----
+      var atual = null;
+      function fechar() { if (atual) { atual.remove(); atual = null; } }
+
+      function popup(titulo, texto, botoes, passos) {
+        fechar();
+        var el = document.createElement('div');
+        el.className = 'wc_popup';
+        el.setAttribute('role', 'dialog');
+        var ico = document.createElement('div'); ico.className = 'wc_ico';
+        var txt = document.createElement('div'); txt.className = 'wc_txt';
+        var st = document.createElement('strong'); st.textContent = titulo;
+        var p = document.createElement('p'); p.textContent = texto;
+        txt.appendChild(st); txt.appendChild(p);
+        var bx = document.createElement('div'); bx.className = 'wc_btns';
+        botoes.forEach(function(b) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = b.principal ? 'wc_sim' : 'wc_nao';
+          btn.textContent = b.texto;
+          btn.onclick = function() { fechar(); b.acao(); };
+          bx.appendChild(btn);
+        });
+        el.appendChild(ico); el.appendChild(txt);
+        if (passos) {
+          var ol = document.createElement('ol');
+          ol.className = 'wc_passos';
+          passos.forEach(function(htmlPasso) {
+            var li = document.createElement('li');
+            var span = document.createElement('span');
+            span.innerHTML = htmlPasso; // texto fixo definido aqui no código
+            li.appendChild(span);
+            ol.appendChild(li);
+          });
+          el.appendChild(ol);
+        }
+        el.appendChild(bx);
+        document.body.appendChild(el);
+        atual = el;
+      }
+
+      var TXT_INSTALAR = 'Instale o app e ative os avisos para saber na hora quando o atendente responder.';
+      var ICONE_COMPARTILHAR = '<svg viewBox="0 0 24 24"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+      var navegadorIosAlternativo = /CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+      var TXT_IOS = 'No iPhone a instalação é feita por você, em 3 toques:';
+      var PASSOS_IOS = navegadorIosAlternativo
+        ? ['Toque em Compartilhar ' + ICONE_COMPARTILHAR + ' na barra de endereço, no topo',
+           'Escolha <b>Adicionar à Tela de Início</b>',
+           'Toque em <b>Adicionar</b>']
+        : ['Toque em Compartilhar ' + ICONE_COMPARTILHAR + ' (ou nos três pontinhos <b>···</b>) na barra de baixo',
+           'Escolha <b>Adicionar à Tela de Início</b>',
+           'Toque em <b>Adicionar</b>'];
+      var TXT_NOTIF = 'Avisamos você quando o atendente responder, mesmo com esta aba em segundo plano.';
+
+      function etapaInstalar(proxima) {
+        if (!mobile || standalone || adiado('webchat_instalar_ate')) return proxima();
+        if (promptInstalar) {
+          popup('Instale o DbChat', TXT_INSTALAR, [
+            { texto: 'Agora não', acao: function() { adiar('webchat_instalar_ate'); proxima(); } },
+            { texto: 'Instalar e ativar avisos', principal: true, acao: function() {
+                var e = promptInstalar; promptInstalar = null;
+                // Os dois pedidos saem no mesmo toque (precisam do gesto do usuário)
+                try {
+                  if ('Notification' in window && Notification.permission === 'default') {
+                    var r = Notification.requestPermission();
+                    if (r && r.then) r.then(function(res) { if (res !== 'granted') adiar('webchat_notif_ate'); });
+                  }
+                } catch (x) {}
+                e.prompt();
+                e.userChoice.then(function(r) { if (r.outcome !== 'accepted') adiar('webchat_instalar_ate'); proxima(); });
+              } }
+          ]);
+        } else if (ios) {
+          popup('Instale o DbChat', TXT_IOS, [
+            { texto: 'Entendi', principal: true, acao: function() { adiar('webchat_instalar_ate'); proxima(); } }
+          ], PASSOS_IOS);
+        } else {
+          proxima();
+        }
+      }
+
+      function etapaNotificacao() {
+        if (!('Notification' in window) || Notification.permission !== 'default' || adiado('webchat_notif_ate')) return;
+        popup('Ativar notificações?', TXT_NOTIF, [
+          { texto: 'Agora não', acao: function() { adiar('webchat_notif_ate'); } },
+          { texto: 'Ativar', principal: true, acao: function() {
+              try {
+                var r = Notification.requestPermission();
+                if (r && r.then) r.then(function(res) { if (res !== 'granted') adiar('webchat_notif_ate'); });
+              } catch (e) {}
+            } }
+        ]);
+      }
+
+      // Só aparece depois que o cliente mandar uma mensagem nesta visita
+      var jaMostrou = false;
+      window.webchatPrimeiraMensagem = function() {
+        if (jaMostrou) return;
+        jaMostrou = true;
+        setTimeout(function() { etapaInstalar(etapaNotificacao); }, 1500);
+      };
+
+      // Descobre se a mensagem veio do histórico ("Messages") ou é ao vivo ("Message")
+      var tent = 0;
+      var espera = setInterval(function() {
+        if (typeof opa !== 'undefined' && opa.socket) {
+          clearInterval(espera);
+          opa.socket.onAny(function(nome) { window.webchatUltimoEvento = nome; });
+        } else if (++tent > 100) {
+          clearInterval(espera);
+        }
+      }, 100);
+
+      // Para testar sem esperar: webchatTestePopup('instalar' | 'ios' | 'notif')
+      window.webchatTestePopup = function(tipo) {
+        var nada = function() {};
+        if (tipo === 'notif') {
+          popup('Ativar notificações?', TXT_NOTIF, [{ texto: 'Agora não', acao: nada }, { texto: 'Ativar', principal: true, acao: nada }]);
+        } else if (tipo === 'ios') {
+          popup('Instale o DbChat', TXT_IOS, [{ texto: 'Entendi', principal: true, acao: nada }], PASSOS_IOS);
+        } else {
+          popup('Instale o DbChat', TXT_INSTALAR, [{ texto: 'Agora não', acao: nada }, { texto: 'Instalar', principal: true, acao: nada }]);
+        }
+      };
+    })();
+  </script>
+  <script>
+    /* Painel de diagnóstico: abra a página com ?debug no final do endereço */
+    (function() {
+      if (!/[?&]debug\b/.test(location.search)) return;
+      var box = document.createElement('pre');
+      box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;margin:0;padding:4px 6px;' +
+        'font:10px/1.3 monospace;color:#7CFC00;background:rgba(0,0,0,.82);pointer-events:none;white-space:pre-wrap;';
+      document.body.appendChild(box);
+
+      var t0 = performance.now();
+      var contagem = {};
+      var recentes = [];
+      var primeiroHistorico = null;
+      var ligado = false;
+
+      function curto(v) { return v ? v.slice(0, 8) + '…' : '—'; }
+      function ck() { var m = document.cookie.match(/opa_user=([^;]+)/); return m ? m[1] : ''; }
+      function ls() { try { return localStorage.getItem('webchat_opa_user') || ''; } catch (e) { return '?'; } }
+
+      function desenhar() {
+        var s = (typeof opa !== 'undefined') ? opa.socket : null;
+        if (s && !ligado) {
+          ligado = true;
+          s.onAny(function(nome) {
+            if (/trunk:status/.test(nome)) return;
+            contagem[nome] = (contagem[nome] || 0) + 1;
+            if (nome === 'Messages' && primeiroHistorico === null) primeiroHistorico = Math.round(performance.now() - t0);
+            recentes.push(nome + '@' + Math.round(performance.now() - t0));
+            if (recentes.length > 6) recentes.shift();
+          });
+        }
+        var qs = (s && s.io && s.io.opts && s.io.opts.query) ? s.io.opts.query : '';
+        var q = (typeof qs === 'string' ? (qs.match(/opa_user=([^&]*)/) || [])[1] : (qs && qs.opa_user)) || '';
+        box.textContent =
+          'cookie=' + curto(ck()) + '  salvo=' + curto(ls()) + '  enviado=' + curto(q) + '\n' +
+          'socket=' + (s ? (s.connected ? 'conectado' : 'desconectado') : 'nulo') +
+          '  balões=' + document.querySelectorAll('.opa_ballon').length +
+          '  tempo=' + Math.round(performance.now() - t0) + 'ms\n' +
+          'Messages 1ª vez=' + (primeiroHistorico === null ? '—' : primeiroHistorico + 'ms') +
+          '  eventos: ' + JSON.stringify(contagem) + '\n' +
+          'últimos: ' + recentes.join(', ');
+      }
+      setInterval(desenhar, 400);
+      desenhar();
+    })();
+  </script>
+</body>
+</html>
