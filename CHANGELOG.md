@@ -8,6 +8,9 @@ git checkout main      # voltar para a mais recente
 git diff v1.0 v1.1     # ver o que mudou entre as duas
 ```
 
+## v1.4 — 2026-10-07
+- Mensagens prontas com hierarquia (Iniciar atendimento em destaque, secundários lado a lado no celular) e novo botão Senha DBTV / central do assinante; mensagens prontas enviadas sem abrir o teclado
+
 ## v1.3 — 2026-10-07
 - Anúncios empilhados na coluna da esquerda (outubro e câmeras); status Online no cabeçalho com 'Atendimento DBNET'; título DBCHAT; campo de mensagem do tipo busca (sem barra de autopreenchimento do Android)
 

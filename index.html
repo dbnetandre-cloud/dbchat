@@ -131,6 +131,17 @@
     @media (max-width: 768px) {
       .destaque { display: none; }
 
+      /* celular: o principal ocupa a linha toda; os secundários dividem a linha de baixo em duas metades iguais */
+      html body .opa_atalhos button.principal { flex: 1 1 100%; }
+      html body .opa_atalhos button:not(.principal) {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+        padding: 8px 10px;
+        font-size: 13px;
+        line-height: 1.25;
+        border-radius: 18px;
+      }
+
       /* celular: o desenho ocupa a largura toda, uma vez só */
       html body .opa_corpo { background-size: 100% auto; }
 
@@ -383,6 +394,17 @@
       transition: background-color .15s, color .15s;
     }
     .opa_atalhos button:hover { background: var(--chat-cor); color: #fff; }
+    /* hierarquia: o principal ocupa a linha toda e é preenchido; os outros são menores e só com contorno */
+    .opa_atalhos button:not(.principal) { font-size: 12.5px; padding: 6px 10px; }
+    .opa_atalhos button.principal {
+      flex: 1 1 100%;
+      padding: 11px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      background: var(--chat-cor);
+      color: #fff;
+    }
+    .opa_atalhos button.principal:hover { filter: brightness(1.1); }
 
 
     /* Atendimento encerrado: campo desativado + botão de novo atendimento */
@@ -579,6 +601,7 @@
 
     body.escuro .opa_atalhos button { background: #172033; color: #8ab6ff; border-color: #3d6fc4; }
     body.escuro .opa_atalhos button:hover { background: var(--chat-cor); color: #fff; }
+    body.escuro .opa_atalhos button.principal { background: var(--chat-cor); color: #fff; border-color: var(--chat-cor); }
     body.escuro .opa_emojis { background: #172033; border-top-color: #2a3750; }
     body.escuro .opa_emojis button:hover { background: #243049; }
     body.escuro .opa_aviso_fim { color: #9fb0c8; }
@@ -929,7 +952,21 @@
     /* Barra inferior: botão de emojis + mensagens prontas */
     (function() {
       // Edite aqui as mensagens prontas
-      var RESPOSTAS = ['Preciso do boleto', 'Iniciar atendimento'];
+      // Envia um texto pelo botão de enviar do widget SEM abrir o teclado: o widget chama input.focus()
+      // depois de enviar, o que no celular faz o teclado subir; aqui isso é bloqueado só nessa chamada.
+      window.webchatEnviarSemFoco = function(input, send, texto) {
+        var focoOriginal = input.focus;
+        input.focus = function() {};
+        try {
+          input.value = texto;
+          send.click();
+        } finally {
+          if (focoOriginal === Element.prototype.focus || focoOriginal === HTMLElement.prototype.focus) delete input.focus;
+          else input.focus = focoOriginal;
+        }
+      };
+
+      var RESPOSTAS = [{ texto: 'Iniciar atendimento', principal: true }, 'Preciso do boleto', 'Senha DBTV / central do assinante'];
       var EMOJIS = ('😀 😃 😄 😁 😅 😂 🤣 😊 🙂 😉 😍 😘 😎 🤗 🤔 😐 😕 😢 😭 😡 ' +
                     '👍 👎 👏 🙌 🙏 💪 👋 🤝 ✌️ 👌 ❤️ 💙 💚 🔥 ⭐ ✅ ❌ ⚠️ 🎉 🚀 ' +
                     '📞 📱 💻 🌐 📶 🔧 🏠 💳 📄 ⏰').split(' ');
@@ -1051,13 +1088,14 @@
         // Mensagens prontas
         var atalhos = document.createElement('div');
         atalhos.className = 'opa_atalhos';
-        RESPOSTAS.forEach(function(txt) {
+        RESPOSTAS.forEach(function(item) {
+          var txt = typeof item === 'string' ? item : item.texto;
           var b = document.createElement('button');
           b.type = 'button';
+          if (typeof item !== 'string' && item.principal) b.className = 'principal';
           b.textContent = txt;
           b.onclick = function() {
-            input.value = txt;
-            send.click();
+            window.webchatEnviarSemFoco(input, send, txt);
             atalhos.remove();
           };
           atalhos.appendChild(b);
@@ -1072,8 +1110,7 @@
           sessionStorage.removeItem('webchat_auto_iniciar');
         } catch (e) {}
         if (auto) {
-          input.value = 'Iniciar atendimento';
-          send.click();
+          window.webchatEnviarSemFoco(input, send, 'Iniciar atendimento');
           atalhos.remove();
         }
 
@@ -1272,8 +1309,7 @@
             var send = chat.querySelector('.opa_rodape_send');
             if (!input || !send) return;
             // Envia /fim como se o cliente tivesse digitado
-            input.value = '/fim';
-            send.click();
+            window.webchatEnviarSemFoco(input, send, '/fim');
             setTimeout(function() { if (window.webchatEncerrar) window.webchatEncerrar(); }, 1200);
           };
           chat.appendChild(ov);
