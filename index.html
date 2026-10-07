@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, interactive-widget=resizes-content">
-  <title> Webchat</title>
+  <title>DBCHAT</title>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0066ff">
   <link rel="icon" href="icon-192.png">
@@ -46,8 +46,8 @@
     body .opa_cabecalho { padding-right: 12px; }
 
     /* ===== DESKTOP: coluna de destaque à esquerda + chat à direita ===== */
-    /* Coluna da arte (proporção 9:16, altura da tela menos a faixa de contato). O chat ocupa o resto. */
-    :root { --coluna-largura: clamp(220px, calc((100vh - 108px) * 0.5625), 38vw); }
+    /* Coluna dos anúncios (dois quadrados 1:1, um em cima do outro). O chat ocupa o resto da tela. */
+    :root { --coluna-largura: clamp(240px, min(36vw, calc(50vh - 62px)), 560px); }
 
     body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: #eef2f7; }
 
@@ -71,15 +71,19 @@
       bottom: 20px;
       left: 20px;
       width: var(--coluna-largura);
+      justify-content: center;
     }
     .planos {
       flex: none;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .planos img {
+    .anuncio {
       display: block;
       width: 100%;
-      height: auto;
-      aspect-ratio: 9 / 16;   /* proporção da arte: nunca corta, mesmo em janela estreita */
+      aspect-ratio: 1 / 1;
       object-fit: cover;
       border-radius: 14px;
       box-shadow: 0 6px 24px rgba(0, 40, 120, .25);
@@ -164,8 +168,13 @@
         animation: wc_subir .2s ease-out;
       }
       /* no menu do celular a arte se ajusta à altura que sobra, e o telefone/site ficam sempre visíveis */
-      body.menu-aberto .planos { flex: 1 1 auto; min-height: 0; }
-      body.menu-aberto .planos img { width: 100%; height: 100%; aspect-ratio: auto; object-fit: contain; box-shadow: none; }
+      body.menu-aberto .planos {
+        flex: 1 1 auto;
+        min-height: 0;
+        justify-content: center;
+        align-items: center;
+      }
+      body.menu-aberto .anuncio { width: min(100%, calc(50vh - 78px)); box-shadow: none; }
       body.menu-aberto .contato { justify-content: space-between; }
       body.menu-aberto .destaque-fechar {
         position: absolute;
@@ -232,14 +241,45 @@
       background: #fff url("logo.png") center / 70% no-repeat;
     }
 
-    /* Nome ao lado da foto */
-    body .opa_cabecalho::after {
-      content: "DBNET";
+    /* Nome ao lado da foto, com o status embaixo */
+    .opa_titulo {
+      order: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+      line-height: 1.2;
+    }
+    .opa_titulo .nome {
       color: #fff;
       font-size: 17px;
       font-weight: 600;
       letter-spacing: .5px;
     }
+    /* cabeçalho estreito (celular ou chat pequeno): não cabe "Atendimento", fica só o nome */
+    body .opa_cabecalho { container-type: inline-size; }
+    @container (max-width: 520px) { .opa_titulo .prefixo { display: none; } }
+    .opa_status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      color: rgba(255, 255, 255, .88);
+    }
+    .opa_status::before {
+      content: "";
+      flex: none;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3ddc84;
+      box-shadow: 0 0 0 2px rgba(61, 220, 132, .35);
+    }
+    .opa_status.conectando::before { background: #ffb300; box-shadow: 0 0 0 2px rgba(255, 179, 0, .35); animation: wc_piscar 1s infinite; }
+    .opa_status.offline::before    { background: #ff5252; box-shadow: 0 0 0 2px rgba(255, 82, 82, .35); }
+    .opa_status.encerrado::before  { background: #b0bec5; box-shadow: 0 0 0 2px rgba(176, 190, 197, .35); }
+    @keyframes wc_piscar { 50% { opacity: .35; } }
 
     body .opa_close,
     body .opa_minimize {
@@ -517,7 +557,7 @@
     body.escuro .contato div strong { color: #e6edf7; }
     body.escuro .contato { background: #172033; box-shadow: none; }
     body.escuro .contato div small { color: #9fb0c8; }
-    body.escuro .planos img { box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
+    body.escuro .anuncio { box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
 
     body.escuro .opa_chat { box-shadow: 0 0 0 1px #2a3750, 0 6px 24px rgba(0, 0, 0, .6); }
     body.escuro .opa_rodape { background: #172033; border-top-color: #2a3750; }
@@ -732,7 +772,8 @@
   <aside class="destaque">
     <button type="button" class="destaque-fechar" aria-label="Fechar">&#10005;</button>
     <div class="planos">
-      <img src="plano-destaque.webp" alt="Outubro da alegria - 800 Mega por R$ 99,90">
+      <img class="anuncio" src="anuncio-outubro.webp" alt="Outubro da alegria - 800 Mega por R$ 99,90">
+      <img class="anuncio" src="anuncio-cachorro.webp" alt="Monitore sua casa em tempo real - 600 Mega + DBcam por R$ 129,80">
     </div>
 
     <div class="contato">
@@ -1146,6 +1187,37 @@
         box.appendChild(menos);
         box.appendChild(mais);
         cab.appendChild(box);
+
+        // Nome + status ("Online" quando a conexão com o atendimento está ativa)
+        var titulo = document.createElement('div');
+        titulo.className = 'opa_titulo';
+        var nomeEl = document.createElement('span');
+        nomeEl.className = 'nome';
+        var prefixo = document.createElement('span');
+        prefixo.className = 'prefixo';
+        prefixo.textContent = 'Atendimento ';
+        nomeEl.appendChild(prefixo);
+        nomeEl.appendChild(document.createTextNode('DBNET'));
+        var statusEl = document.createElement('span');
+        statusEl.className = 'opa_status';
+        titulo.appendChild(nomeEl);
+        titulo.appendChild(statusEl);
+        cab.appendChild(titulo);
+        function atualizarStatus() {
+          var sock = (typeof opa !== 'undefined') ? opa.socket : null;
+          var classe, texto;
+          if (chat.classList.contains('atendimento_encerrado')) { classe = 'encerrado'; texto = 'Encerrado'; }
+          else if (!sock) { classe = 'conectando'; texto = 'Conectando…'; }
+          else if (sock.connected) { classe = ''; texto = 'Online'; }
+          else if (!navigator.onLine) { classe = 'offline'; texto = 'Sem internet'; }
+          else { classe = 'conectando'; texto = 'Reconectando…'; }
+          statusEl.className = 'opa_status' + (classe ? ' ' + classe : '');
+          if (statusEl.textContent !== texto) statusEl.textContent = texto;
+        }
+        atualizarStatus();
+        setInterval(atualizarStatus, 1000);
+        window.addEventListener('online', atualizarStatus);
+        window.addEventListener('offline', atualizarStatus);
 
         // Menu hambúrguer (aparece só no celular): abre a propaganda
         var menu = document.createElement('button');

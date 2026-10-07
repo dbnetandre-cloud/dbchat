@@ -11,8 +11,8 @@ Página de atendimento da DBNET com o webchat do Opa Suite.
 | `sw.js` | Service worker (instalação do app e notificações) |
 | `icon-*.png` | Ícones do app |
 | `logo.png` | Logo usado no cabeçalho do chat e nos popups |
-| `fundo-padrao*.png` | Fundo da conversa (tema claro e escuro) |
-| `plano-destaque.webp` | Arte da coluna da esquerda no desktop (trocar todo mês) |
+| `fundo-doodle*.webp` | Fundo da conversa (tema claro e escuro) |
+| `anuncio-*.webp` | Anúncios da coluna da esquerda (quadrados 1080x1080; trocar quando mudar a campanha) |
 
 ## Publicar no GitHub Pages
 
@@ -25,5 +25,5 @@ Página de atendimento da DBNET com o webchat do Opa Suite.
 - **Mensagens prontas:** lista `RESPOSTAS` no script do final do `index.html`.
 - **Telefone e site:** bloco `<aside class="destaque">` no início do `<body>`.
 - **Cor principal:** variável `--chat-cor` no começo do CSS.
-- **Arte do mês:** substitua `plano-destaque.webp` mantendo a proporção 9:16 (1080x1920).
+- **Anúncios:** substitua `anuncio-outubro.webp` e `anuncio-cachorro.webp` mantendo a proporção quadrada (1080x1080), ou ajuste as tags `<img class="anuncio">` no `index.html`.
 - **Diagnóstico:** abra a página com `?debug` no final do endereço.
