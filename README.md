@@ -27,3 +27,4 @@ Página de atendimento da DBNET com o webchat do Opa Suite.
 - **Cor principal:** variável `--chat-cor` no começo do CSS.
 - **Anúncios:** substitua `anuncio-outubro.webp` e `anuncio-cachorro.webp` mantendo a proporção quadrada (1080x1080), ou ajuste as tags `<img class="anuncio">` no `index.html`.
 - **Diagnóstico:** abra a página com `?debug` no final do endereço.
+- **Link com mensagem pronta:** `https://chat.dbnet.com.vc/?msg=Ref%20A8F3K2` envia a mensagem sozinha, uma vez, quando o chat abre (até 200 caracteres, texto codificado na URL). Serve para o atendente identificar o cliente. Qualquer pessoa pode editar o link, então use um código opaco e não coloque dados pessoais.

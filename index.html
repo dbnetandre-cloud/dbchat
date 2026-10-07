@@ -185,7 +185,24 @@
         justify-content: center;
         align-items: center;
       }
-      body.menu-aberto .anuncio { width: min(100%, calc(50vh - 78px)); box-shadow: none; }
+      /* O espaço dos anúncios é medido na própria área (cqw/cqh), então não depende da barra do navegador do celular.
+         A linha de baixo é só um plano B para navegadores sem essa medida. */
+      body.menu-aberto .planos { container-type: size; }
+      body.menu-aberto .anuncio {
+        width: min(100%, calc(50dvh - 78px));
+        width: min(100cqw, calc(50cqh - 6px));
+        box-shadow: none;
+      }
+      body.menu-aberto .anuncio { cursor: zoom-in; }
+      /* anúncio ampliado: sozinho, no centro da tela, de ponta a ponta na largura */
+      body.menu-ampliado .anuncio:not(.ampliado) { display: none; }
+      body.menu-ampliado .anuncio.ampliado {
+        width: min(100vw, 100cqh);
+        max-width: none;
+        border-radius: 0;
+        cursor: zoom-out;
+        animation: wc_subir .2s ease-out;
+      }
       body.menu-aberto .contato { justify-content: space-between; }
       body.menu-aberto .destaque-fechar {
         position: absolute;
@@ -1103,6 +1120,25 @@
 
         chat.insertBefore(atalhos, rodape);
 
+        // Link com mensagem pronta: https://chat.dbnet.com.vc/?msg=Protocolo%2012345
+        // Envia a mensagem sozinha, uma vez, assim que o chat abre. Serve para o atendente saber de quem é o atendimento.
+        var msgLink = '';
+        try { msgLink = new URLSearchParams(location.search).get('msg') || ''; } catch (e) {}
+        msgLink = msgLink.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (msgLink) {
+          var jaMandada = null;
+          try { jaMandada = localStorage.getItem('webchat_msg_link'); } catch (e) {}
+          // tira o ?msg= da barra de endereço, para recarregar a página não reenviar
+          try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+          if (jaMandada !== msgLink) {
+            atalhos.remove();
+            setTimeout(function() {
+              window.webchatEnviarSemFoco(input, send, msgLink);
+              try { localStorage.setItem('webchat_msg_link', msgLink); } catch (e) {}
+            }, 800);
+          }
+        }
+
         // Veio do botão "Iniciar novo atendimento": já manda "Iniciar atendimento" sozinho
         var auto = false;
         try {
@@ -1264,11 +1300,32 @@
         menu.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
         cab.insertBefore(menu, cab.firstChild);
         var coluna = document.querySelector('.destaque');
-        function menuAbrir(v) { document.body.classList.toggle('menu-aberto', v); }
+        function reduzir() {
+          document.body.classList.remove('menu-ampliado');
+          var amp = document.querySelector('.anuncio.ampliado');
+          if (amp) amp.classList.remove('ampliado');
+        }
+        function menuAbrir(v) {
+          document.body.classList.toggle('menu-aberto', v);
+          if (!v) reduzir();
+        }
         menu.onclick = function() { menuAbrir(true); };
         if (coluna) {
           coluna.addEventListener('click', function(e) {
-            if (e.target === coluna || (e.target.closest && e.target.closest('.destaque-fechar'))) menuAbrir(false);
+            var alvo = e.target;
+            if (alvo.closest && alvo.closest('.destaque-fechar')) { menuAbrir(false); return; }
+            if (!document.body.classList.contains('menu-aberto')) return;
+            var anuncio = alvo.closest && alvo.closest('.anuncio');
+            if (anuncio) {
+              // toque no anúncio: amplia (se já está ampliado, volta para a lista)
+              if (document.body.classList.contains('menu-ampliado')) { reduzir(); }
+              else { anuncio.classList.add('ampliado'); document.body.classList.add('menu-ampliado'); }
+              return;
+            }
+            // toque no fundo: se estiver ampliado, só volta; senão, fecha o menu
+            if (alvo === coluna || (alvo.classList && alvo.classList.contains('planos'))) {
+              if (document.body.classList.contains('menu-ampliado')) reduzir(); else menuAbrir(false);
+            }
           });
         }
         document.addEventListener('keydown', function(e) { if (e.key === 'Escape') menuAbrir(false); });
