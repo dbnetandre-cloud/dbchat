@@ -1017,6 +1017,44 @@
           rodape.classList.remove('gravando');
         }
 
+        // O navegador grava em WEBM/MP4, formatos que o agente virtual do Opa não reconhece como áudio.
+        // Aqui a gravação é convertida para WAV (16 kHz, mono, 16 bits): formato comum e leve o bastante para voz.
+        // Para voltar a enviar o arquivo original, troque FORMATO_AUDIO para 'original'.
+        var FORMATO_AUDIO = 'wav';
+
+        function paraWav(blob) {
+          return blob.arrayBuffer().then(function(buf) {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            var ctx = new Ctx();
+            return new Promise(function(ok, erro) { ctx.decodeAudioData(buf, ok, erro); }).then(function(audio) {
+              if (ctx.close) ctx.close();
+              var TAXA = 16000;
+              var off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * TAXA)), TAXA);
+              var fonte = off.createBufferSource();
+              fonte.buffer = audio;
+              fonte.connect(off.destination);
+              fonte.start(0);
+              return off.startRendering();
+            }).then(function(renderizado) {
+              var dados = renderizado.getChannelData(0);
+              var bytes = new ArrayBuffer(44 + dados.length * 2);
+              var v = new DataView(bytes);
+              function txt(pos, t) { for (var i = 0; i < t.length; i++) v.setUint8(pos + i, t.charCodeAt(i)); }
+              txt(0, 'RIFF'); v.setUint32(4, 36 + dados.length * 2, true); txt(8, 'WAVE');
+              txt(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+              v.setUint32(24, 16000, true); v.setUint32(28, 16000 * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+              txt(36, 'data'); v.setUint32(40, dados.length * 2, true);
+              for (var i = 0; i < dados.length; i++) {
+                var x = Math.max(-1, Math.min(1, dados[i]));
+                v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7FFF, true);
+              }
+              return new Blob([bytes], { type: 'audio/wav' });
+            });
+          });
+        }
+
+        window.webchatParaWav = paraWav; // exposto para teste no console
+
         function enviarAudio(blob, nome) {
           var fr = new FileReader();
           fr.onload = function() {
@@ -1044,7 +1082,14 @@
               var tipo = (mr.mimeType || 'audio/webm').split(';')[0];
               limpar();
               if (!deveEnviar || !chunks.length) return;
-              enviarAudio(new Blob(chunks, { type: tipo }), 'audio.' + (tipo.indexOf('mp4') > -1 ? 'm4a' : 'webm'));
+              var original = new Blob(chunks, { type: tipo });
+              var extOriginal = tipo.indexOf('mp4') > -1 ? 'm4a' : 'webm';
+              if (FORMATO_AUDIO === 'wav') {
+                paraWav(original).then(function(wav) { enviarAudio(wav, 'audio.wav'); })
+                  .catch(function() { enviarAudio(original, 'audio.' + extOriginal); }); // se a conversão falhar, manda o original
+              } else {
+                enviarAudio(original, 'audio.' + extOriginal);
+              }
             };
             mr.start();
             inicio = Date.now();
@@ -1053,7 +1098,7 @@
             timer = setInterval(function() {
               var seg = Math.floor((Date.now() - inicio) / 1000);
               tempo.textContent = Math.floor(seg / 60) + ':' + ('0' + (seg % 60)).slice(-2);
-              if (seg >= 300) btnEnviar.click(); // limite de 5 minutos
+              if (seg >= 120) btnEnviar.click(); // limite de 2 minutos (o WAV ocupa ~1,9 MB por minuto)
             }, 250);
           }).catch(function() {
             alert('Não foi possível acessar o microfone. Libere a permissão no navegador (o site precisa estar em HTTPS ou localhost).');
